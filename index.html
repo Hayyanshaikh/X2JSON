@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Excel to JSON Customizer - New Monochromatic Theme</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"
+    />
+
+    <!-- Tailwind Custom Color Configuration -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              // User-defined colors
+              "bg-main": "#121212",
+              box: "#1d1d1d",
+              primary: "#6900ec",
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- Use Inter font -->
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
+      body {
+        font-family: "Inter", sans-serif;
+        /* Directly setting the main background color */
+        background-color: #121212;
+      }
+
+      /* Strict Black & White Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      .rotate-180 {
+        transform: rotate(180deg);
+      }
+
+      /* Subtle Border Color (10% White Opacity) */
+      .border-subtle {
+        border-color: rgba(255, 255, 255, 0.1) !important;
+      }
+      .divide-subtle > * + * {
+        border-color: rgba(255, 255, 255, 0.1) !important;
+      }
+
+      /* Custom style for high-contrast input focus */
+      .input-style {
+        background-color: #1d1d1d; /* Box color */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+        border-radius: 0.375rem; /* rounded-md */
+      }
+      .input-style:focus {
+        outline: 2px solid #6900ec; /* Primary color outline */
+        outline-offset: -2px;
+        border-color: #6900ec;
+      }
+
+      /* --- Custom Toggle Switch Styles (Based on new theme) --- */
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 44px; /* w-11 */
+        height: 24px; /* h-6 */
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #1d1d1d; /* Box track */
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        transition: 0.4s;
+        border-radius: 24px; /* Rounded pill shape */
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 2px;
+        bottom: 2px;
+        background-color: #fff; /* White knob when OFF */
+        transition: 0.4s;
+        border-radius: 50%; /* Circle knob */
+      }
+
+      input:checked + .slider {
+        background-color: #6900ec; /* Primary color track when checked */
+        border-color: #6900ec;
+      }
+
+      input:checked + .slider:before {
+        background-color: #fff; /* White knob when ON */
+        transform: translateX(20px);
+      }
+    </style>
+    <!-- jQuery CDN -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <!-- SheetJS CDN for reading Excel/CSV -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+
+  <body class="text-white min-h-screen">
+    <!-- Main Container -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- Sticky Left Sidebar (Controls) -->
+      <div
+        id="sidebar"
+        class="w-72 bg-box p-4 flex flex-col space-y-4 border-r border-subtle overflow-y-auto"
+      >
+        <h1 class="text-2xl font-bold text-primary">Excel → JSON</h1>
+
+        <!-- File Upload and Options -->
+        <div class="space-y-3 p-3 border border-subtle rounded-lg bg-box">
+          <label class="block text-sm font-medium">1. Upload Excel/CSV</label>
+          <div
+            id="dropzone"
+            class="text-sm text-gray-400 border-2 border-dashed border-subtle rounded-lg p-4 text-center cursor-pointer hover:bg-box/50 transition duration-200"
+          >
+            Drag & Drop file here, or
+            <input
+              type="file"
+              id="excelFile"
+              accept=".xlsx, .xls, .csv"
+              class="hidden"
+            />
+            <button
+              onclick="$('#excelFile').click()"
+              class="mt-2 w-full py-1.5 bg-primary text-white font-semibold border border-primary hover:opacity-80 transition duration-200 rounded-md"
+            >
+              Browse Files
+            </button>
+          </div>
+          <div
+            id="fileInfo"
+            class="text-sm text-white opacity-70 mt-2 hidden"
+          ></div>
+
+          <label for="sheetSelect" class="block text-sm font-medium mt-3"
+            >Select Sheet:</label
+          >
+          <select
+            id="sheetSelect"
+            class="w-full input-style p-2 transition duration-200"
+            disabled
+          >
+            <option class="bg-box">No file loaded</option>
+          </select>
+        </div>
+
+        <!-- Global Options -->
+        <div class="space-y-3 p-3 border border-subtle rounded-lg bg-box">
+          <label class="block text-sm font-medium mb-2">Global Settings</label>
+
+          <!-- Pretty Print Toggle -->
+          <div class="flex items-center justify-between">
+            <label for="prettyPrint" class="text-sm">Pretty Print JSON</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="prettyPrint" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Wrap Array Toggle -->
+          <div class="flex items-center justify-between">
+            <label for="wrapArray" class="text-sm">Wrap in Root Array</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="wrapArray" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Skip Empty Rows Toggle -->
+          <div class="flex items-center justify-between">
+            <label for="skipEmptyRows" class="text-sm">Skip Empty Rows</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="skipEmptyRows" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <p
+            class="text-xs text-white opacity-70 pt-2 border-t border-subtle mt-2"
+          >
+            Note: Array Merging feature
+            <code class="bg-white/10 text-white p-1 rounded">items[].key1</code>
+            is fully supported.
+          </p>
+        </div>
+
+        <!-- Action Button -->
+        <button
+          id="convertBtn"
+          class="py-3 bg-primary text-white font-bold text-lg border border-primary hover:opacity-80 rounded-lg shadow-lg disabled:opacity-50 transition duration-200"
+          disabled
+        >
+          Generate JSON
+        </button>
+
+        <!-- Progress Bar -->
+        <div id="progressBarContainer" class="hidden">
+          <div class="text-sm mb-1">Processing...</div>
+          <div class="w-full border border-subtle rounded-full h-2.5">
+            <div
+              id="progressBar"
+              class="bg-primary h-2.5 rounded-full transition-all duration-500"
+              style="width: 0%"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Preset Buttons -->
+        <div class="flex space-x-2 pt-2 border-t border-subtle">
+          <button
+            id="savePresetBtn"
+            class="flex-1 py-1 text-xs bg-box text-white border border-subtle hover:bg-primary hover:text-white rounded-md transition duration-200"
+            disabled
+          >
+            Save Mapping
+          </button>
+          <button
+            id="loadPresetBtn"
+            class="flex-1 py-1 text-xs bg-box text-white border border-subtle hover:bg-primary hover:text-white rounded-md transition duration-200"
+          >
+            Load Mapping
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Content Area (Panels) -->
+      <div class="flex-1 p-4 overflow-y-auto space-y-4">
+        <div
+          id="messageBox"
+          class="p-3 rounded-lg text-sm hidden border border-subtle"
+          role="alert"
+        ></div>
+
+        <!-- Panel: Sheet Preview -->
+        <div
+          id="sheetPreviewPanel"
+          class="bg-box rounded-xl border border-subtle overflow-hidden"
+        >
+          <div
+            class="panel-header flex justify-between items-center p-4 cursor-pointer bg-box hover:bg-box/50 transition duration-150 border-b border-subtle"
+          >
+            <h2 class="text-xl font-semibold flex items-center">
+              <i class="ti ti-table-share text-primary mr-2"></i> Sheet Preview
+              (First 10 Rows)
+            </h2>
+            <button class="toggle-btn text-white hover:opacity-70">
+              <svg
+                class="w-5 h-5 transform rotate-180 transition-transform duration-300"
+                data-state="expanded"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                ></path>
+              </svg>
+            </button>
+          </div>
+          <div
+            class="panel-content overflow-x-auto max-h-96"
+            style="display: block"
+          >
+            <table
+              id="sheetPreviewTable"
+              class="min-w-full divide-y divide-subtle"
+            >
+              <thead></thead>
+              <tbody>
+                <tr>
+                  <td
+                    colspan="100"
+                    class="p-4 text-center text-white opacity-50"
+                  >
+                    Upload an Excel/CSV file to see the data.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel: Column Mapping -->
+        <div
+          id="mappingPanel"
+          class="bg-box rounded-xl border border-subtle overflow-hidden"
+        >
+          <div
+            class="panel-header flex justify-between items-center p-4 cursor-pointer bg-box hover:bg-box/50 transition duration-150 border-b border-subtle"
+          >
+            <h2 class="text-xl font-semibold flex items-center">
+              <i class="ti ti-rotate-2 text-primary mr-2"></i> Column Mapping &
+              Nesting
+            </h2>
+            <button class="toggle-btn text-white hover:opacity-70">
+              <svg
+                class="w-5 h-5 transform rotate-180 transition-transform duration-300"
+                data-state="expanded"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                ></path>
+              </svg>
+            </button>
+          </div>
+          <div class="panel-content p-4" style="display: block">
+            <p class="text-sm text-white opacity-70 mb-4">
+              Define the new JSON key. Use dots for nesting (e.g.,
+              <code class="bg-white/10 text-white p-1 rounded">user.name</code>)
+              or brackets for arrays (e.g.,
+              <code class="bg-white/10 text-white p-1 rounded">items[].id</code
+              >).
+            </p>
+            <div class="max-h-96 overflow-y-auto">
+              <table class="min-w-full divide-y divide-subtle">
+                <thead>
+                  <tr
+                    class="text-xs font-medium tracking-wider text-white uppercase bg-box border-b border-subtle"
+                  >
+                    <th class="p-3 text-left">Original Header</th>
+                    <th class="p-3 text-left">Mapped JSON Key</th>
+                    <th class="p-3 text-left">Data Type</th>
+                    <!-- NEW COLUMN HEADER FOR TRANSFORMATION -->
+                    <th class="p-3 text-left">
+                      Transform Rule (Find=Replace|...)
+                    </th>
+                    <th class="p-3 text-left">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="mappingBody" class="divide-y divide-subtle">
+                  <tr>
+                    <td
+                      colspan="5"
+                      class="p-4 text-center text-white opacity-50"
+                    >
+                      Column mapping will appear here.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel: Custom Keys -->
+        <div
+          id="customKeysPanel"
+          class="bg-box rounded-xl border border-subtle overflow-hidden"
+        >
+          <div
+            class="panel-header flex justify-between items-center p-4 cursor-pointer bg-box hover:bg-box/50 transition duration-150 border-b border-subtle"
+          >
+            <h2 class="text-xl font-semibold flex items-center">
+              <i class="ti ti-puzzle text-primary mr-2"></i> Custom Keys (Static
+              Values)
+            </h2>
+            <button class="toggle-btn text-white hover:opacity-70">
+              <svg
+                class="w-5 h-5 transform rotate-0 transition-transform duration-300"
+                data-state="collapsed"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                ></path>
+              </svg>
+            </button>
+          </div>
+          <div class="panel-content p-4" style="display: none">
+            <p class="text-sm text-white opacity-70 mb-4">
+              Add fixed key-value pairs to every record. Supports nesting (e.g.,
+              <code class="bg-white/10 text-white p-1 rounded"
+                >meta.timestamp</code
+              >).
+            </p>
+            <div id="customKeysList" class="space-y-3">
+              <!-- Custom Key Rows will be appended here -->
+            </div>
+            <button
+              id="addCustomKeyBtn"
+              class="mt-4 px-3 py-1.5 bg-box text-white border border-subtle hover:bg-primary hover:text-white rounded-md text-sm font-semibold transition duration-200"
+            >
+              + Add Custom Key
+            </button>
+          </div>
+        </div>
+
+        <!-- Panel: JSON Output -->
+        <div
+          id="jsonOutputPanel"
+          class="bg-box rounded-xl border border-subtle overflow-hidden"
+        >
+          <div
+            class="panel-header flex justify-between items-center p-4 cursor-pointer bg-box hover:bg-box/50 transition duration-150 border-b border-subtle"
+          >
+            <h2 class="text-xl font-semibold flex items-center">
+              <i class="ti ti-box text-primary mr-2"></i> JSON Output
+            </h2>
+            <button class="toggle-btn text-white hover:opacity-70">
+              <svg
+                class="w-5 h-5 transform rotate-180 transition-transform duration-300"
+                data-state="expanded"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                ></path>
+              </svg>
+            </button>
+          </div>
+          <div class="panel-content p-4 space-y-3" style="display: block">
+            <div class="flex justify-end space-x-2">
+              <button
+                id="downloadJsonBtn"
+                class="px-4 py-2 bg-box text-white border border-subtle hover:bg-primary hover:text-white rounded-md text-sm font-semibold disabled:opacity-50 transition duration-200"
+                disabled
+              >
+                Download JSON
+              </button>
+            </div>
+            <pre
+              id="jsonOutput"
+              class="bg-box text-white p-4 rounded-lg overflow-x-auto text-sm min-h-60 max-h-96 whitespace-pre-wrap border border-subtle"
+            >
+Click 'Generate JSON' to see the output.</pre
+            >
+          </div>
+        </div>
+
+        <!-- Footer for space -->
+        <div class="h-12"></div>
+      </div>
+    </div>
+
+    <script>
+      // Global state
+      let workbook = null;
+      let dataHeaders = [];
+      let rawData = [];
+      let isProcessing = false;
+
+      // --- Firestore Global Variables Setup (Mandatory) ---
+      // Note: Firestore is not strictly used for this local processing app,
+      // but the global variables are defined as a standard safety practice.
+      const appId =
+        typeof __app_id !== "undefined" ? __app_id : "default-app-id";
+      const firebaseConfig =
+        typeof __firebase_config !== "undefined"
+          ? JSON.parse(__firebase_config)
+          : {};
+      const initialAuthToken =
+        typeof __initial_auth_token !== "undefined"
+          ? __initial_auth_token
+          : null;
+      let db = null;
+      let auth = null;
+
+      // --- Utility Functions ---
+
+      /** Shows a message box (toast replacement) */
+      function showMessage(text, type = "info") {
+        const box = $("#messageBox");
+        let classes = "bg-box text-white border-subtle";
+        if (type === "success") {
+          // Success uses primary color for strong indication
+          classes = "bg-primary text-white border-primary";
+        } else if (type === "error") {
+          // Error uses white text on dark box with subtle border
+          classes = "bg-box text-white border-subtle";
+        }
+        box
+          .removeClass()
+          .addClass("p-3 rounded-lg text-sm mb-4 border " + classes)
+          .text(text)
+          .slideDown(200);
+        setTimeout(() => box.slideUp(200), 5000);
+      }
+
+      /** Converts cell value based on detected type or selected type */
+      function convertValue(value, type) {
+        if (value === null || value === undefined) return null;
+        if (String(value).trim() === "" && type !== "string") return null;
+
+        switch (type) {
+          case "number":
+            const num = parseFloat(value);
+            return isNaN(num) ? String(value) : num;
+          case "date":
+            if (typeof value === "number" && value > 1) {
+              try {
+                // Excel date to Date object
+                const date = XLSX.SSF.parse_date_code(value);
+                const dateObj = new Date(Date.UTC(date.y, date.m - 1, date.d));
+                return dateObj.toISOString().split("T")[0];
+              } catch (e) {
+                return String(value);
+              }
+            }
+            const dateVal = new Date(value);
+            return isNaN(dateVal.getTime())
+              ? String(value)
+              : dateVal.toISOString().split("T")[0];
+          case "boolean":
+            const str = String(value).toLowerCase().trim();
+            if (str === "true" || str === "1" || str === "yes") return true;
+            if (str === "false" || str === "0" || str === "no") return false;
+            return value;
+          case "string":
+            return String(value).trim();
+          case "auto":
+          default:
+            if (
+              value === "TRUE" ||
+              value === "FALSE" ||
+              value === "true" ||
+              value === "false"
+            )
+              return String(value).toLowerCase() === "true";
+            if (!isNaN(parseFloat(value)) && isFinite(value))
+              return parseFloat(value);
+            return String(value);
+        }
+      }
+
+      /** Core function to process one data record (row) against the mapping and build nested JSON. */
+      function processRecord(record, mapping, customKeys) {
+        const result = {};
+        const arrayMap = new Map();
+
+        // 1. Process Column Mappings
+        for (let i = 0; i < mapping.length; i++) {
+          const map = mapping[i];
+          const originalKey = map.originalKey;
+          const targetPath = map.targetPath.trim();
+          const dataType = map.dataType;
+          const transformRule = map.transformRule; // <-- Retrieve new rule
+
+          if (map.action === "skip" || !targetPath) continue;
+
+          let value = record[originalKey];
+
+          // --- Custom Value Transformation Logic (New) ---
+          if (transformRule && value !== null && value !== undefined) {
+            let stringValue = String(value).trim();
+
+            // Rule format: FIND1=REPLACE1|FIND2=REPLACE2
+            const rules = transformRule.split("|");
+
+            for (const rule of rules) {
+              const parts = rule.trim().split("=");
+              if (parts.length === 2) {
+                const find = parts[0].trim();
+                const replace = parts[1].trim();
+
+                // Case-insensitive comparison for finding the value
+                if (stringValue.toUpperCase() === find.toUpperCase()) {
+                  value = replace; // Apply replacement
+                  break; // Stop after the first match (simulating conditional check)
+                }
+              }
+            }
+          }
+          // --- End Custom Value Transformation Logic ---
+
+          value = convertValue(value, dataType); // Convert after potential transformation
+
+          if (value === null && $("#skipEmptyRows").is(":checked")) continue;
+
+          const isArrayPath =
+            targetPath.includes("[]") || targetPath.match(/\[\d+\]/);
+
+          if (isArrayPath) {
+            // --- Array Grouping Logic (e.g., items[].id) ---
+
+            const parts = targetPath.split(".");
+            let arrayPath = [];
+            let arrayRootName = "";
+            let keyPathInArray = "";
+
+            let foundArrayPart = false;
+            for (let part of parts) {
+              const match = part.match(/(\w+)\[(\d*|\])/);
+              if (match) {
+                arrayRootName = match[1];
+                keyPathInArray = targetPath.substring(
+                  targetPath.indexOf(part) + part.length + 1
+                );
+                foundArrayPart = true;
+                break;
+              }
+              arrayPath.push(part);
+            }
+
+            if (!foundArrayPart) continue;
+
+            let arrayParent = result;
+            if (arrayPath.length > 0) {
+              arrayParent = arrayPath.reduce((acc, part) => {
+                acc[part] = acc[part] || {};
+                return acc[part];
+              }, result);
+            }
+
+            arrayParent[arrayRootName] = arrayParent[arrayRootName] || [];
+            const array = arrayParent[arrayRootName];
+
+            let currentArrayObject = arrayMap.get(arrayRootName);
+            if (!currentArrayObject) {
+              currentArrayObject = {};
+              arrayMap.set(arrayRootName, currentArrayObject);
+              array.push(currentArrayObject);
+            }
+
+            let currentNested = currentArrayObject;
+            const nestedParts = keyPathInArray.split(".");
+            for (let k = 0; k < nestedParts.length; k++) {
+              const part = nestedParts[k];
+              const isLast = k === nestedParts.length - 1;
+
+              if (!isLast) {
+                currentNested[part] = currentNested[part] || {};
+                currentNested = currentNested[part];
+              } else {
+                currentNested[part] = value;
+              }
+            }
+          } else {
+            // --- Standard Object Nesting Logic (e.g., user.name) ---
+            let current = result;
+            const pathParts = targetPath.split(".");
+
+            for (let j = 0; j < pathParts.length; j++) {
+              let part = pathParts[j];
+              const isLast = j === pathParts.length - 1;
+
+              if (!isLast) {
+                if (
+                  !current[part] ||
+                  typeof current[part] !== "object" ||
+                  Array.isArray(current[part])
+                ) {
+                  current[part] = {};
+                }
+                current = current[part];
+              } else {
+                current[part] = value;
+              }
+            }
+          }
+        }
+
+        // 2. Process Custom Keys
+        customKeys.forEach((custom) => {
+          if (custom.key && custom.value !== undefined) {
+            let current = result;
+            const parts = custom.key.split(".");
+            let value = convertValue(custom.value, custom.type);
+
+            for (let i = 0; i < parts.length; i++) {
+              const part = parts[i];
+              const isLast = i === parts.length - 1;
+
+              if (!isLast) {
+                current[part] = current[part] || {};
+                current = current[part];
+              } else {
+                current[part] = value;
+              }
+            }
+          }
+        });
+
+        return result;
+      }
+
+      // --- UI/Handler Functions ---
+
+      /** Handles file selection and reading */
+      function handleFile(file) {
+        if (isProcessing) return;
+        isProcessing = true;
+        showMessage(`Reading file: ${file.name}...`, "info");
+        $("#fileInfo")
+          .text(
+            `File: ${file.name} | Size: ${(file.size / 1024).toFixed(2)} KB`
+          )
+          .removeClass("hidden");
+        $("#convertBtn").prop("disabled", true).text("Reading...");
+        $("#progressBarContainer").removeClass("hidden");
+        $("#progressBar").css("width", "10%");
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const data = e.target.result;
+          workbook = XLSX.read(data, { type: "binary", cellDates: true });
+          populateSheetSelect(workbook);
+          isProcessing = false;
+          $("#convertBtn").prop("disabled", false).text("Generate JSON");
+          $("#progressBarContainer").addClass("hidden");
+          showMessage(
+            "File loaded successfully. Please map columns.",
+            "success"
+          );
+          loadSheetData();
+        };
+        reader.readAsBinaryString(file);
+      }
+
+      /** Populates the sheet dropdown */
+      function populateSheetSelect(wb) {
+        const select = $("#sheetSelect");
+        select.empty().prop("disabled", false);
+        wb.SheetNames.forEach((name) => {
+          select.append(
+            `<option value="${name}" class="bg-box">${name}</option>`
+          );
+        });
+        select.off("change").on("change", loadSheetData);
+      }
+
+      /** Reads data from the selected sheet and updates previews/mappings */
+      function loadSheetData() {
+        if (!workbook) return;
+
+        const sheetName = $("#sheetSelect").val();
+        const ws = workbook.Sheets[sheetName];
+        if (!ws) return;
+
+        const sheetData = XLSX.utils.sheet_to_json(ws, {
+          raw: false,
+          defval: null,
+        });
+        rawData = sheetData;
+
+        if (rawData.length > 0) {
+          dataHeaders = Object.keys(rawData[0]);
+        } else {
+          dataHeaders = [];
+        }
+
+        populateSheetPreview(rawData.slice(0, 10), dataHeaders);
+        populateColumnMapping(dataHeaders);
+      }
+
+      /** Populates the Sheet Preview table */
+      function populateSheetPreview(data, headers) {
+        const table = $("#sheetPreviewTable");
+        const thead = table.find("thead");
+        const tbody = table.find("tbody");
+
+        thead.empty();
+        tbody.empty();
+
+        if (headers.length === 0) {
+          tbody.html(
+            `<tr><td colspan="100" class="p-4 text-center text-white opacity-50">No data found in this sheet.</td></tr>`
+          );
+          return;
+        }
+
+        // Header Row
+        let headerRowHtml = '<tr class="bg-box border-b border-subtle">';
+        headers.forEach((h) => {
+          headerRowHtml += `<th class="px-4 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">${h}</th>`;
+        });
+        headerRowHtml += "</tr>";
+        thead.html(headerRowHtml);
+
+        // Data Rows
+        data.forEach((row) => {
+          let rowHtml =
+            '<tr class="border-b border-subtle hover:bg-box/50 transition duration-150">';
+          headers.forEach((h) => {
+            const value = row[h] !== null && row[h] !== undefined ? row[h] : "";
+            rowHtml += `<td class="px-4 py-2 whitespace-nowrap text-sm text-white">${value}</td>`;
+          });
+          rowHtml += "</tr>";
+          tbody.append(rowHtml);
+        });
+      }
+
+      /** Populates the Column Mapping table */
+      function populateColumnMapping(headers) {
+        const tbody = $("#mappingBody");
+        tbody.empty();
+
+        if (headers.length === 0) {
+          tbody.html(
+            `<tr><td colspan="5" class="p-4 text-center text-white opacity-50">No headers found to map.</td></tr>`
+          );
+          return;
+        }
+
+        const typeOptions = [
+          { val: "auto", text: "Auto" },
+          { val: "string", text: "String" },
+          { val: "number", text: "Number" },
+          { val: "date", text: "Date (YYYY-MM-DD)" },
+        ];
+
+        const actionOptions = [
+          { val: "keep", text: "Keep" },
+          { val: "skip", text: "Skip" },
+        ];
+
+        headers.forEach((h, index) => {
+          const defaultKey = h
+            .replace(/[^a-zA-Z0-9]/g, "_")
+            .toLowerCase()
+            .replace(/_+/g, "_")
+            .replace(/^_|_$/g, "");
+          const initialPath = defaultKey || `column_${index + 1}`;
+
+          const $row = $(
+            `<tr id="map-row-${index}" class="border-b border-subtle hover:bg-box/50 transition duration-150"></tr>`
+          );
+
+          // Original Header
+          $row.append(`<td class="p-3 font-mono text-sm text-white">${h}</td>`);
+
+          // Mapped JSON Key
+          $row.append(`
+                <td class="p-3">
+                    <input type="text" data-original="${h}" value="${initialPath}"
+                           class="w-full input-style text-sm p-1.5 focus:ring-primary focus:border-primary transition duration-200 mapping-target-path"
+                           placeholder="e.g., user.name or items[].id">
+                </td>
+            `);
+
+          // Data Type
+          let typeSelect = `<select class="w-28 input-style text-sm p-1.5 focus:ring-primary focus:border-primary transition duration-200 mapping-data-type">`;
+          typeOptions.forEach((opt) => {
+            const selected = opt.val === "auto" ? "selected" : "";
+            typeSelect += `<option value="${opt.val}" ${selected} class="bg-box">${opt.text}</option>`;
+          });
+          typeSelect += `</select>`;
+          $row.append(`<td class="p-3">${typeSelect}</td>`);
+
+          // NEW: Transform Rule
+          $row.append(`
+                <td class="p-3">
+                    <input type="text" 
+                           class="w-full input-style text-sm p-1.5 focus:ring-primary focus:border-primary transition duration-200 mapping-transform-rule"
+                           placeholder="e.g., PO=Purchase Order|SO=Sales Order">
+                </td>
+            `);
+
+          // Action
+          let actionSelect = `<select class="w-24 input-style text-sm p-1.5 focus:ring-primary focus:border-primary transition duration-200 mapping-action">`;
+          actionOptions.forEach((opt) => {
+            const selected = opt.val === "keep" ? "selected" : "";
+            actionSelect += `<option value="${opt.val}" ${selected} class="bg-box">${opt.text}</option>`;
+          });
+          actionSelect += `</select>`;
+          $row.append(`<td class="p-3">${actionSelect}</td>`);
+
+          tbody.append($row);
+        });
+
+        // Add handler to disable/enable target path input based on action
+        $(".mapping-action").on("change", function () {
+          const $row = $(this).closest("tr");
+          const $input = $row.find(".mapping-target-path");
+          const $transform = $row.find(".mapping-transform-rule");
+
+          if ($(this).val() === "skip") {
+            $input.prop("disabled", true).addClass("opacity-50");
+            $transform.prop("disabled", true).addClass("opacity-50");
+          } else {
+            $input.prop("disabled", false).removeClass("opacity-50");
+            $transform.prop("disabled", false).removeClass("opacity-50");
+          }
+        });
+      }
+
+      /** Retrieves all current column mappings from the UI */
+      function getColumnMappings() {
+        const mappings = [];
+        $("#mappingBody tr").each(function () {
+          const $row = $(this);
+          const originalKey = $row
+            .find(".mapping-target-path")
+            .data("original");
+          const targetPath = $row.find(".mapping-target-path").val();
+          const dataType = $row.find(".mapping-data-type").val();
+          const transformRule = $row.find(".mapping-transform-rule").val(); // <-- New: Get Transform Rule
+          const action = $row.find(".mapping-action").val();
+
+          mappings.push({
+            originalKey: originalKey,
+            targetPath: targetPath,
+            dataType: dataType,
+            transformRule: transformRule, // <-- New: Add Transform Rule
+            action: action,
+          });
+        });
+        return mappings;
+      }
+
+      /** Retrieves all current custom key definitions from the UI */
+      function getCustomKeys() {
+        const customKeys = [];
+        $("#customKeysList .custom-key-row").each(function () {
+          const $row = $(this);
+          const key = $row.find(".custom-key-name").val().trim();
+          const value = $row.find(".custom-key-value").val();
+          const type = $row.find(".custom-key-type").val();
+
+          if (key) {
+            customKeys.push({
+              key: key,
+              value: value,
+              type: type,
+            });
+          }
+        });
+        return customKeys;
+      }
+
+      /** Generates the final JSON output */
+      function generateJson() {
+        if (rawData.length === 0) {
+          showMessage("Error: No data loaded from Excel/CSV.", "error");
+          return;
+        }
+
+        const mappings = getColumnMappings();
+        const customKeys = getCustomKeys();
+        const finalJson = [];
+        const totalRows = rawData.length;
+
+        $("#convertBtn").prop("disabled", true).text("Converting...");
+        $("#progressBarContainer").removeClass("hidden");
+        $("#jsonOutput").text("Processing...");
+
+        // Use setTimeout to process in batches for responsiveness
+        let rowIndex = 0;
+        const batchSize = 1000;
+
+        function processBatch() {
+          const batchEnd = Math.min(rowIndex + batchSize, totalRows);
+
+          for (let i = rowIndex; i < batchEnd; i++) {
+            const row = rawData[i];
+            const record = processRecord(row, mappings, customKeys);
+
+            if (Object.keys(record).length > 0) {
+              finalJson.push(record);
+            }
+          }
+
+          rowIndex = batchEnd;
+          const progress = Math.round((rowIndex / totalRows) * 100);
+          $("#progressBar").css("width", progress + "%");
+
+          if (rowIndex < totalRows) {
+            setTimeout(processBatch, 10); // Continue processing next batch
+          } else {
+            // Conversion Finished
+            const wrapArray = $("#wrapArray").is(":checked");
+            const prettyPrint = $("#prettyPrint").is(":checked");
+
+            const outputData = wrapArray
+              ? finalJson
+              : finalJson.length > 0
+              ? finalJson[0]
+              : {};
+
+            const jsonString = prettyPrint
+              ? JSON.stringify(outputData, null, 2)
+              : JSON.stringify(outputData);
+
+            $("#jsonOutput").text(jsonString);
+            $("#downloadJsonBtn").prop("disabled", jsonString.length === 0);
+            $("#convertBtn").prop("disabled", false).text("Generate JSON");
+            $("#progressBarContainer").addClass("hidden");
+
+            showMessage(
+              `Conversion successful! ${finalJson.length} records generated.`,
+              "success"
+            );
+          }
+        }
+
+        processBatch();
+      }
+
+      /** Adds a new row for custom keys */
+      function addCustomKeyRow(key = "", value = "", type = "string") {
+        const $row = $(`
+            <div class="custom-key-row flex space-x-2 p-2 bg-box border border-subtle rounded-md items-center">
+                <!-- Key Name -->
+                <input type="text" value="${key}" placeholder="Custom Key Path (e.g., source.name)"
+                       class="flex-1 input-style text-sm p-1.5 custom-key-name" />
+
+                <!-- Value Input -->
+                <input type="text" value="${value}" placeholder="Value (e.g., Excel Upload)"
+                       class="flex-1 input-style text-sm p-1.5 custom-key-value" />
+
+                <!-- Type Selector -->
+                <select class="w-24 input-style text-sm p-1.5 custom-key-type">
+                    <option value="string" ${
+                      type === "string" ? "selected" : ""
+                    } class="bg-box">String</option>
+                    <option value="number" ${
+                      type === "number" ? "selected" : ""
+                    } class="bg-box">Number</option>
+                    <option value="boolean" ${
+                      type === "boolean" ? "selected" : ""
+                    } class="bg-box">Boolean</option>
+                    <option value="date" ${
+                      type === "date" ? "selected" : ""
+                    } class="bg-box">Date</option>
+                </select>
+
+                <!-- Delete Button (SVG kept for simplicity and B&W theme) -->
+                <button type="button" class="text-white hover:text-primary delete-custom-key">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3m-4 1h14"></path></svg>
+                </button>
+            </div>
+        `);
+        $("#customKeysList").append($row);
+      }
+
+      /** Saves current mapping and custom keys to LocalStorage (for future use) */
+      function savePreset() {
+        if (dataHeaders.length === 0) {
+          showMessage("Error: Load a file before saving a preset.", "error");
+          return;
+        }
+
+        const preset = {
+          mappings: getColumnMappings(),
+          customKeys: getCustomKeys(),
+        };
+
+        try {
+          localStorage.setItem("excelToJsonPreset", JSON.stringify(preset));
+          showMessage("Mapping preset saved!", "success");
+        } catch (e) {
+          showMessage("Error saving preset to LocalStorage.", "error");
+        }
+      }
+
+      /** Loads mapping and custom keys from LocalStorage (for future use) */
+      function loadPreset() {
+        try {
+          const storedPreset = localStorage.getItem("excelToJsonPreset");
+          if (!storedPreset) {
+            showMessage("No saved preset found.", "info");
+            return;
+          }
+
+          const preset = JSON.parse(storedPreset);
+          if (!preset || !preset.mappings || !preset.customKeys) {
+            showMessage("Saved preset data is invalid.", "error");
+            return;
+          }
+
+          if (dataHeaders.length === 0) {
+            showMessage(
+              "Please load a file first to apply the preset mapping.",
+              "info"
+            );
+            return;
+          }
+
+          // Apply Mappings
+          $("#mappingBody tr").each(function () {
+            const $row = $(this);
+            const originalKey = $row
+              .find(".mapping-target-path")
+              .data("original");
+            const matchingMap = preset.mappings.find(
+              (m) => m.originalKey === originalKey
+            );
+
+            if (matchingMap) {
+              const isDisabled = matchingMap.action === "skip";
+              $row
+                .find(".mapping-target-path")
+                .val(matchingMap.targetPath)
+                .prop("disabled", isDisabled)
+                .toggleClass("opacity-50", isDisabled);
+              $row.find(".mapping-data-type").val(matchingMap.dataType);
+              $row.find(".mapping-action").val(matchingMap.action);
+              $row
+                .find(".mapping-transform-rule")
+                .val(matchingMap.transformRule); // <-- New: Load Transform Rule
+            }
+          });
+
+          // Apply Custom Keys
+          $("#customKeysList").empty();
+          preset.customKeys.forEach((ck) => {
+            addCustomKeyRow(ck.key, ck.value, ck.type);
+          });
+
+          showMessage("Mapping preset loaded successfully.", "success");
+        } catch (e) {
+          showMessage("Error loading preset: Invalid JSON data.", "error");
+        }
+      }
+
+      // --- Event Listeners (Document Ready) ---
+      $(document).ready(function () {
+        // Initial setup for Custom Keys
+        addCustomKeyRow("source", "Excel Upload", "string");
+
+        // Panel Collapse Toggle
+        $(".panel-header").on("click", function () {
+          const $btnSvg = $(this).find(".toggle-btn svg");
+          const $content = $(this).next(".panel-content");
+
+          $content.slideToggle(300, function () {
+            const isCollapsed = $content.is(":hidden");
+            $btnSvg.attr("data-state", isCollapsed ? "collapsed" : "expanded");
+            $btnSvg.toggleClass("rotate-180", !isCollapsed);
+          });
+        });
+
+        // File Input Handler
+        $("#excelFile").on("change", function (e) {
+          if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+          }
+        });
+
+        // Drag and Drop Handlers
+        const $dropzone = $("#dropzone");
+        $dropzone.on("dragover", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          $(this).addClass("bg-box/50 border-solid");
+        });
+
+        $dropzone.on("dragleave", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          $(this).removeClass("bg-box/50 border-solid");
+        });
+
+        $dropzone.on("drop", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          $(this).removeClass("bg-box/50 border-solid");
+          const files = e.originalEvent.dataTransfer.files;
+          if (files.length > 0) {
+            handleFile(files[0]);
+          }
+        });
+
+        // Custom Key Add Button
+        $("#addCustomKeyBtn").on("click", () => addCustomKeyRow());
+
+        // Custom Key Delete Button (Delegated event)
+        $("#customKeysList").on("click", ".delete-custom-key", function () {
+          $(this)
+            .closest(".custom-key-row")
+            .slideUp(200, function () {
+              $(this).remove();
+            });
+        });
+
+        // Generate JSON Button
+        $("#convertBtn").on("click", generateJson);
+
+        // Download JSON Button
+        $("#downloadJsonBtn").on("click", function () {
+          const jsonText = $("#jsonOutput").text();
+          if (!jsonText || jsonText.includes("Processing...")) {
+            showMessage("No valid JSON data to download.", "error");
+            return;
+          }
+
+          const blob = new Blob([jsonText], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "data_export_" + Date.now() + ".json";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showMessage("JSON file downloaded!", "success");
+        });
+
+        // Preset Buttons
+        $("#savePresetBtn").on("click", savePreset);
+        $("#loadPresetBtn").on("click", loadPreset);
+
+        // Enable preset save button once file is loaded
+        $("#excelFile").on("change", function () {
+          $("#savePresetBtn").prop("disabled", false);
+        });
+      });
+    </script>
+  </body>
+</html>
